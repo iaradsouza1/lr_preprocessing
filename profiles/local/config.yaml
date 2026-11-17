@@ -1,0 +1,20 @@
+# Local execution profile:  snakemake --profile profiles/local
+executor: local
+use-conda: true
+conda-frontend: mamba
+cores: 32
+jobs: 4
+rerun-incomplete: true
+printshellcmds: true
+default-resources:
+  mem_mb: 8000
+  runtime: 240
+set-resources:
+  minimap2_align:
+    mem_mb: 32000
+  isoquant_discovery:
+    mem_mb: 64000
+  isoquant_requant:
+    mem_mb: 64000
+  sqanti3_qc:
+    mem_mb: 32000

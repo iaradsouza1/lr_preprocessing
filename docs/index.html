@@ -1,0 +1,713 @@
+<title>lr_pipeline — long-read isoform discovery, QC & quantification</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --paper:#f5f8f8; --surface:#ffffff; --surface-2:#eef2f3; --surface-3:#e5ebeb;
+    --ink:#132120; --ink-soft:#334846; --muted:#5f7371; --faint:#8aa09d;
+    --line:#d7e0df; --line-strong:#c1cecc;
+    --accent:#0c8996; --accent-strong:#086b76; --accent-wash:#dff0f1;
+    --pacbio:#cf6a37; --pacbio-wash:#f7e6dc;
+    --ont:#4f5fd0; --ont-wash:#e3e5f8;
+    --ok:#2b8f63; --warn:#b9821b; --crit:#c8483f;
+    --shadow:0 1px 2px rgba(19,33,32,.05),0 6px 24px -12px rgba(19,33,32,.18);
+    --mono:ui-monospace,"JetBrains Mono","SFMono-Regular","SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#0b1413; --surface:#101d1c; --surface-2:#152423; --surface-3:#1b2c2b;
+      --ink:#e7f0ee; --ink-soft:#c1d2cf; --muted:#94a9a6; --faint:#6d8481;
+      --line:#243634; --line-strong:#324644;
+      --accent:#27b3c0; --accent-strong:#54c8d3; --accent-wash:#0f2d30;
+      --pacbio:#e2895a; --pacbio-wash:#2c1f17;
+      --ont:#8290ef; --ont-wash:#1a1d33;
+      --ok:#42b981; --warn:#d5a03e; --crit:#e0685e;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#f5f8f8; --surface:#ffffff; --surface-2:#eef2f3; --surface-3:#e5ebeb;
+    --ink:#132120; --ink-soft:#334846; --muted:#5f7371; --faint:#8aa09d;
+    --line:#d7e0df; --line-strong:#c1cecc;
+    --accent:#0c8996; --accent-strong:#086b76; --accent-wash:#dff0f1;
+    --pacbio:#cf6a37; --pacbio-wash:#f7e6dc; --ont:#4f5fd0; --ont-wash:#e3e5f8;
+    --ok:#2b8f63; --warn:#b9821b; --crit:#c8483f;
+    --shadow:0 1px 2px rgba(19,33,32,.05),0 6px 24px -12px rgba(19,33,32,.18);
+  }
+  :root[data-theme="dark"]{
+    --paper:#0b1413; --surface:#101d1c; --surface-2:#152423; --surface-3:#1b2c2b;
+    --ink:#e7f0ee; --ink-soft:#c1d2cf; --muted:#94a9a6; --faint:#6d8481;
+    --line:#243634; --line-strong:#324644;
+    --accent:#27b3c0; --accent-strong:#54c8d3; --accent-wash:#0f2d30;
+    --pacbio:#e2895a; --pacbio-wash:#2c1f17; --ont:#8290ef; --ont-wash:#1a1d33;
+    --ok:#42b981; --warn:#d5a03e; --crit:#e0685e;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 30px -14px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{transition:none!important}}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  }
+  ::selection{background:var(--accent-wash);color:var(--accent-strong)}
+  a{color:var(--accent-strong);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,.mono{font-family:var(--mono);font-size:.86em;font-feature-settings:"liga" 0}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 28px}
+
+  /* ---------- header ---------- */
+  header.top{
+    position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--paper) 88%,transparent);
+    backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line);
+  }
+  .top-row{display:flex;align-items:center;gap:18px;padding:13px 0;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+  .brand .dna{font-size:20px;transform:translateY(1px)}
+  .brand h1{font-size:16px;margin:0;font-family:var(--mono);font-weight:600;letter-spacing:-.01em}
+  .brand .tag{font-size:12px;color:var(--muted)}
+  .toggle{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:3px}
+  .toggle button{
+    font:inherit;font-size:12.5px;font-weight:600;border:0;background:transparent;color:var(--muted);
+    padding:5px 13px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:7px;letter-spacing:.01em;
+  }
+  .toggle button .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.8}
+  .toggle button[data-p="pacbio"]{color:var(--pacbio)}
+  .toggle button[data-p="ont"]{color:var(--ont)}
+  body[data-platform="pacbio"] .toggle button[data-p="pacbio"]{background:var(--surface);color:var(--pacbio);box-shadow:var(--shadow)}
+  body[data-platform="ont"] .toggle button[data-p="ont"]{background:var(--surface);color:var(--ont);box-shadow:var(--shadow)}
+
+  /* ---------- hero ---------- */
+  .hero{padding:52px 0 30px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-strong)}
+  .hero h2{font-size:clamp(30px,4.6vw,46px);line-height:1.05;letter-spacing:-.025em;margin:16px 0 0;text-wrap:balance;max-width:16ch}
+  .hero p.lead{font-size:18px;color:var(--ink-soft);max-width:60ch;margin:18px 0 0}
+  .meta-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+  .chip{font-family:var(--mono);font-size:12px;padding:5px 10px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-soft)}
+  .chip b{color:var(--accent-strong);font-weight:600}
+
+  /* ---------- lineage strip ---------- */
+  .lineage{margin:30px 0 8px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+  .lineage .lin-head{display:flex;justify-content:space-between;align-items:center;padding:13px 18px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
+  .lineage .lin-head h3{margin:0;font-size:13px;font-family:var(--mono);letter-spacing:.02em;color:var(--ink)}
+  .lineage .lin-head span{font-size:12.5px;color:var(--muted)}
+  .flow{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:22px 18px;scrollbar-width:thin}
+  .node{flex:0 0 auto;min-width:112px;display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center}
+  .node .art{font-family:var(--mono);font-size:11.5px;font-weight:600;padding:8px 11px;border-radius:8px;border:1px solid var(--line-strong);background:var(--surface-2);color:var(--ink);white-space:nowrap}
+  .node .art.data{border-color:var(--accent);color:var(--accent-strong);background:var(--accent-wash)}
+  .node .op{font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .arrow{flex:0 0 auto;align-self:center;color:var(--faint);padding:0 4px;margin-top:-14px;font-size:15px}
+  .node .art.pb-only{border-color:var(--pacbio);color:var(--pacbio);background:var(--pacbio-wash)}
+  .node .art.ont-only{border-color:var(--ont);color:var(--ont);background:var(--ont-wash)}
+
+  /* ---------- main grid ---------- */
+  .grid{display:grid;grid-template-columns:250px 1fr;gap:40px;padding:34px 0 60px;align-items:start}
+  @media(max-width:860px){.grid{grid-template-columns:1fr;gap:20px}}
+  nav.rail{position:sticky;top:74px}
+  @media(max-width:860px){nav.rail{position:static}}
+  .rail .rail-group{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:20px 0 8px;padding-left:2px}
+  .rail a{display:flex;gap:11px;align-items:baseline;padding:7px 10px;border-radius:8px;color:var(--ink-soft);font-size:13.5px;border:1px solid transparent;transition:background .15s,border-color .15s}
+  .rail a .num{font-family:var(--mono);font-size:11px;color:var(--faint);min-width:16px}
+  .rail a:hover{background:var(--surface-2);text-decoration:none}
+  .rail a.active{background:var(--surface);border-color:var(--line);color:var(--ink);box-shadow:var(--shadow)}
+  .rail a.active .num{color:var(--accent-strong)}
+
+  /* ---------- stage cards ---------- */
+  section.stage{scroll-margin-top:80px;margin-bottom:20px}
+  .card{border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+  .card .head{display:flex;gap:14px;align-items:flex-start;padding:20px 22px 16px}
+  .stagenum{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent-strong);background:var(--accent-wash);border:1px solid var(--accent);border-radius:7px;padding:4px 8px;line-height:1;margin-top:3px}
+  .card h3{margin:0;font-size:19px;letter-spacing:-.015em}
+  .card .rulefile{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:3px}
+  .card .desc{color:var(--ink-soft);font-size:14.5px;padding:0 22px 4px;margin:0}
+  .tools{display:flex;flex-wrap:wrap;gap:6px;padding:12px 22px 4px}
+  .tool{font-family:var(--mono);font-size:11.5px;padding:3px 9px;border-radius:6px;background:var(--surface-3);color:var(--ink-soft);border:1px solid var(--line)}
+  .scope{margin-left:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px dashed var(--line-strong);border-radius:6px;padding:4px 8px;align-self:center}
+
+  .io{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);margin-top:14px;border-top:1px solid var(--line)}
+  @media(max-width:520px){.io{grid-template-columns:1fr}}
+  .io .col{background:var(--surface);padding:14px 22px 16px}
+  .io .col h4{margin:0 0 9px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:7px}
+  .io .col h4 .glyph{color:var(--accent)}
+  .files{display:flex;flex-direction:column;gap:6px}
+  .file{display:flex;gap:9px;align-items:baseline;font-size:13px}
+  .file .ft{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.03em;padding:2px 6px;border-radius:5px;border:1px solid var(--line-strong);color:var(--muted);background:var(--surface-2);min-width:52px;text-align:center;flex:0 0 auto}
+  .file .ft.fastq{color:var(--accent-strong);border-color:var(--accent);background:var(--accent-wash)}
+  .file .ft.bam{color:var(--pacbio);border-color:var(--pacbio);background:var(--pacbio-wash)}
+  .file .ft.gtf{color:var(--ont);border-color:var(--ont);background:var(--ont-wash)}
+  .file .fp{font-family:var(--mono);font-size:12px;color:var(--ink-soft);word-break:break-all}
+  .file .note{color:var(--muted);font-size:12.5px}
+
+  pre.cmd{margin:0;background:var(--surface-2);border-top:1px solid var(--line);padding:15px 22px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--ink-soft)}
+  pre.cmd .fl-pb{color:var(--pacbio);font-weight:600}
+  pre.cmd .fl-ont{color:var(--ont);font-weight:600}
+  pre.cmd .c{color:var(--faint)}
+  pre.cmd .k{color:var(--accent-strong);font-weight:600}
+
+  .gate{border-left:3px solid var(--warn);background:linear-gradient(90deg,color-mix(in srgb,var(--warn) 8%,var(--surface)),var(--surface));}
+  .gate .stagenum{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,var(--surface));border-color:var(--warn)}
+  .gate-badge{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--warn);font-family:var(--mono)}
+
+  .pb-only{}.ont-only{}
+  body[data-platform="pacbio"] .ont-only{display:none!important}
+  body[data-platform="ont"] .pb-only{display:none!important}
+
+  /* ---------- panels (inputs / outputs / run) ---------- */
+  .panel{margin:0 0 26px}
+  .panel > h2{font-size:24px;letter-spacing:-.02em;margin:0 0 4px;display:flex;align-items:baseline;gap:12px}
+  .panel > h2 .lbl{font-family:var(--mono);font-size:12px;color:var(--faint);letter-spacing:.1em}
+  .panel > p.sub{color:var(--ink-soft);margin:0 0 18px;max-width:64ch}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.twocol{grid-template-columns:1fr}}
+  .subcard{border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+  .subcard .sc-h{padding:13px 18px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12.5px;color:var(--ink);display:flex;justify-content:space-between;align-items:center}
+  .subcard .sc-h .path{color:var(--muted);font-size:11.5px}
+  .subcard .sc-b{padding:14px 18px}
+  table.ss{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.ss th,table.ss td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+  table.ss th{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600}
+  table.ss td{font-family:var(--mono);color:var(--ink-soft);font-size:12px}
+  table.ss tr:last-child td{border-bottom:0}
+  .k-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .k-list li{display:flex;gap:10px;font-size:13px;align-items:baseline}
+  .k-list .key{font-family:var(--mono);font-size:12px;color:var(--accent-strong);min-width:118px;flex:0 0 auto}
+  .k-list .val{color:var(--ink-soft)}
+  .tree{font-family:var(--mono);font-size:12.5px;line-height:1.75;color:var(--ink-soft);white-space:pre;overflow-x:auto;margin:0}
+  .tree .d{color:var(--accent-strong);font-weight:600}
+  .tree .fin{color:var(--ont);font-weight:600}
+  .tree .cm{color:var(--faint)}
+
+  .runcard{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow);margin-bottom:14px}
+  .runcard .rc-h{padding:12px 18px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;font-size:14px;font-weight:600}
+  .runcard .rc-h .step{font-family:var(--mono);font-size:11px;color:var(--accent-strong);border:1px solid var(--accent);background:var(--accent-wash);border-radius:6px;padding:3px 7px}
+  .runcard pre{margin:0;padding:14px 18px;background:var(--surface-2);overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--ink-soft)}
+  .runcard pre .c{color:var(--faint)}
+  .runcard pre .k{color:var(--accent-strong)}
+
+  .callout{display:flex;gap:12px;padding:14px 18px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;background:var(--surface);font-size:13.5px;color:var(--ink-soft);margin:16px 0}
+  .callout .ic{color:var(--accent);flex:0 0 auto;margin-top:1px}
+  .callout b{color:var(--ink)}
+
+  footer{border-top:1px solid var(--line);padding:30px 0 60px;color:var(--muted);font-size:13px}
+  footer .cols{display:flex;flex-wrap:wrap;gap:34px;justify-content:space-between}
+  footer h5{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 8px}
+  footer ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
+  .divider{height:1px;background:var(--line);margin:6px 0 0}
+</style>
+
+<header class="top">
+  <div class="wrap top-row">
+    <div class="brand">
+      <span class="dna">🧬</span>
+      <h1>lr_pipeline</h1>
+      <span class="tag">long-read isoform discovery · QC · quantification</span>
+    </div>
+    <div class="toggle" role="group" aria-label="Sequencing platform">
+      <button data-p="pacbio" aria-pressed="true"><span class="dot"></span>PacBio</button>
+      <button data-p="ont" aria-pressed="false"><span class="dot"></span>ONT</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <div class="eyebrow">Snakemake workflow · reproduces Shimada et al. 2024</div>
+  <h2>From long reads to a clean, quantified isoform catalog.</h2>
+  <p class="lead">A generic, samplesheet-driven pipeline for PacBio HiFi and Oxford Nanopore cDNA.
+  It discovers transcript isoforms with IsoQuant, cleans them of artifacts with SQANTI3, then
+  re-quantifies against the filtered catalog — one path, two platforms, driven entirely by config.</p>
+  <div class="meta-chips">
+    <span class="chip">reference <b>GRCh38 + GENCODE v41</b></span>
+    <span class="chip">orchestrator <b>Snakemake ≥8</b></span>
+    <span class="chip">envs <b>lr_pipeline + sqanti3</b></span>
+    <span class="chip">profiles <b>local · slurm</b></span>
+    <span class="chip">input <b>FASTQ (full-length reads)</b></span>
+  </div>
+
+  <div class="lineage">
+    <div class="lin-head">
+      <h3>data lineage</h3>
+      <span>how a file becomes an answer — <b class="mono">viewing the <span class="pb-only" style="color:var(--pacbio)">PacBio</span><span class="ont-only" style="color:var(--ont)">ONT</span> path</b></span>
+    </div>
+    <div class="flow">
+      <div class="node"><span class="art data">FASTQ</span><span class="op">raw reads</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="op pb-only">length filter</span><span class="op ont-only">pychopper + filter</span><span class="art data">filtered.fastq</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="op">minimap2</span><span class="art pb-only">sorted BAM</span><span class="art ont-only">sorted BAM</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="op">IsoQuant</span><span class="art">models.gtf</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="op">SQANTI3 QC</span><span class="art">classification</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="op">SQANTI3 filter</span><span class="art">filtered.gtf</span></div>
+      <div class="arrow">→</div>
+      <div class="node"><span class="op">IsoQuant re-quant</span><span class="art data">counts · TPM</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap grid">
+  <nav class="rail" aria-label="Pipeline stages">
+    <div class="rail-group">Reference</div>
+    <a href="#s0"><span class="num">00</span> Reference &amp; setup</a>
+    <div class="rail-group">Per sample</div>
+    <a href="#s1"><span class="num">01</span> QC gate — read stats</a>
+    <a href="#s2"><span class="num">02</span> Preprocess reads</a>
+    <a href="#s3"><span class="num">03</span> Align (minimap2)</a>
+    <a href="#s4"><span class="num">04</span> QC gate — identity</a>
+    <div class="rail-group">Per platform</div>
+    <a href="#s5"><span class="num">05</span> IsoQuant discovery</a>
+    <a href="#s6"><span class="num">06</span> SQANTI3 QC</a>
+    <a href="#s7"><span class="num">07</span> SQANTI3 filter</a>
+    <a href="#s8"><span class="num">08</span> IsoQuant re-quant</a>
+    <div class="rail-group">Results</div>
+    <a href="#s9"><span class="num">09</span> Downstream table</a>
+    <a href="#inputs"><span class="num">▸</span> Inputs</a>
+    <a href="#outputs"><span class="num">▸</span> Outputs</a>
+    <a href="#run"><span class="num">▸</span> Running it</a>
+  </nav>
+
+  <main>
+    <!-- 00 -->
+    <section class="stage" id="s0">
+      <div class="card">
+        <div class="head">
+          <span class="stagenum">00</span>
+          <div>
+            <h3>Reference &amp; setup</h3>
+            <div class="rulefile">workflow/rules/refs.smk</div>
+          </div>
+          <span class="scope">once</span>
+        </div>
+        <p class="desc">Fetch and prepare everything the run depends on: the human genome, the GENCODE
+        annotation, and the SQANTI3 repository. Runs once and is cached in <code>resources/</code>.</p>
+        <div class="tools"><span class="tool">curl</span><span class="tool">samtools&nbsp;faidx</span><span class="tool">minimap2&nbsp;-d</span><span class="tool">git&nbsp;clone</span></div>
+        <div class="io">
+          <div class="col">
+            <h4><span class="glyph">↓</span> inputs</h4>
+            <div class="files">
+              <div class="file"><span class="ft">url</span><span class="fp">GENCODE v41 genome + GTF</span></div>
+              <div class="file"><span class="ft">url</span><span class="fp">ConesaLab/SQANTI3.git</span></div>
+            </div>
+          </div>
+          <div class="col">
+            <h4><span class="glyph">↑</span> outputs</h4>
+            <div class="files">
+              <div class="file"><span class="ft fastq">fa</span><span class="fp">GRCh38.primary_assembly.genome.fa<span class="note"> (+ .fai)</span></span></div>
+              <div class="file"><span class="ft gtf">gtf</span><span class="fp">gencode.v41.annotation.gtf</span></div>
+              <div class="file"><span class="ft">repo</span><span class="fp">resources/SQANTI3/ <span class="note">(CAGE + polyA data)</span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 01 -->
+    <section class="stage" id="s1">
+      <div class="card gate">
+        <div class="head">
+          <span class="stagenum">01</span>
+          <div>
+            <h3>QC gate — read statistics</h3>
+            <div class="rulefile">workflow/rules/qc.smk · seqkit_stats, nanoplot</div>
+          </div>
+          <span class="scope">per sample</span>
+        </div>
+        <p class="desc">Profile raw reads before touching them. <code>seqkit stats</code> gives length/quality
+        summaries and <code>NanoPlot</code> renders a report; the mean quality is checked against the
+        declared platform. <span class="gate-badge">◈ gate: <code>qc.quality_gate</code> = warn | fail</span></p>
+        <div class="tools"><span class="tool">seqkit&nbsp;stats&nbsp;-a</span><span class="tool">NanoPlot</span></div>
+        <div class="io">
+          <div class="col">
+            <h4><span class="glyph">↓</span> inputs</h4>
+            <div class="files"><div class="file"><span class="ft fastq">fastq</span><span class="fp">raw reads (from samplesheet)</span></div></div>
+          </div>
+          <div class="col">
+            <h4><span class="glyph">↑</span> outputs</h4>
+            <div class="files">
+              <div class="file"><span class="ft">tsv</span><span class="fp">qc/seqkit/{sample}.stats.tsv</span></div>
+              <div class="file"><span class="ft">html</span><span class="fp">qc/nanoplot/{sample}/NanoPlot-report.html</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02 -->
+    <section class="stage" id="s2">
+      <div class="card">
+        <div class="head">
+          <span class="stagenum">02</span>
+          <div>
+            <h3>Preprocess reads</h3>
+            <div class="rulefile">workflow/rules/preprocess.smk · prepare_reads</div>
+          </div>
+          <span class="scope">per sample</span>
+        </div>
+        <p class="desc">Keep reads in the informative length window (100–15000 bp).
+        <span class="ont-only"><b>ONT cDNA that isn't oriented</b> is first run through <code>pychopper</code>
+        to find and orient full-length reads.</span>
+        <span class="pb-only"><b>PacBio HiFi</b> reads are already full-length and oriented, so they go
+        straight to the length filter.</span></p>
+        <div class="tools">
+          <span class="tool ont-only" style="border-color:var(--ont);color:var(--ont)">pychopper</span>
+          <span class="tool">seqkit&nbsp;seq&nbsp;-m&nbsp;100&nbsp;-M&nbsp;15000</span>
+        </div>
+        <div class="io">
+          <div class="col"><h4><span class="glyph">↓</span> inputs</h4><div class="files"><div class="file"><span class="ft fastq">fastq</span><span class="fp">raw reads</span></div></div></div>
+          <div class="col"><h4><span class="glyph">↑</span> outputs</h4><div class="files"><div class="file"><span class="ft fastq">fastq</span><span class="fp">reads/{sample}.filtered.fastq.gz</span></div></div></div>
+        </div>
+        <pre class="cmd"><span class="ont-only"><span class="k">pychopper</span> -t $threads reads.fastq oriented.fastq   <span class="c"># ONT, oriented=no only</span>
+</span><span class="k">seqkit seq</span> -m <span class="k">100</span> -M <span class="k">15000</span> <span class="pb-only">reads.fastq</span><span class="ont-only">oriented.fastq</span> | gzip &gt; {sample}.filtered.fastq.gz</pre>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section class="stage" id="s3">
+      <div class="card">
+        <div class="head">
+          <span class="stagenum">03</span>
+          <div>
+            <h3>Align — minimap2 (splice-aware)</h3>
+            <div class="rulefile">workflow/rules/align.smk · minimap2_align</div>
+          </div>
+          <span class="scope">per sample</span>
+        </div>
+        <p class="desc">Spliced alignment to GRCh38 with the <code>--MD</code> tag (needed downstream),
+        secondary alignments dropped, then filtered to <code>MAPQ ≥ 10</code>, sorted and indexed.
+        <b>These whole-genome BAMs are kept as durable outputs.</b> The preset switches by platform.</p>
+        <div class="tools"><span class="tool">minimap2&nbsp;-ax&nbsp;splice</span><span class="tool">samtools&nbsp;view&nbsp;-q&nbsp;10</span><span class="tool">samtools&nbsp;sort/index</span></div>
+        <div class="io">
+          <div class="col"><h4><span class="glyph">↓</span> inputs</h4><div class="files">
+            <div class="file"><span class="ft fastq">fastq</span><span class="fp">{sample}.filtered.fastq.gz</span></div>
+            <div class="file"><span class="ft fastq">fa</span><span class="fp">genome</span></div>
+          </div></div>
+          <div class="col"><h4><span class="glyph">↑</span> outputs</h4><div class="files">
+            <div class="file"><span class="ft bam">bam</span><span class="fp">align/{sample}.sorted.bam <span class="note">(+ .bai) · kept</span></span></div>
+          </div></div>
+        </div>
+        <pre class="cmd"><span class="k">minimap2</span> -ax <span class="pb-only fl-pb">splice:hq -uf -C5</span><span class="ont-only fl-ont">splice -uf</span> --MD --secondary=no genome.fa reads.fastq.gz \
+  | <span class="k">samtools view</span> -q <span class="k">10</span> -b - | <span class="k">samtools sort</span> -o {sample}.sorted.bam -
+<span class="k">samtools index</span> {sample}.sorted.bam</pre>
+      </div>
+    </section>
+
+    <!-- 04 -->
+    <section class="stage" id="s4">
+      <div class="card gate">
+        <div class="head">
+          <span class="stagenum">04</span>
+          <div>
+            <h3>QC gate — alignment identity</h3>
+            <div class="rulefile">workflow/rules/qc.smk · identity_check → scripts/identity_check.py</div>
+          </div>
+          <span class="scope">per sample</span>
+        </div>
+        <p class="desc">Mean per-base identity (<code>1 − de:f</code>, from minimap2) over primary alignments,
+        compared to the platform threshold.
+        <span class="gate-badge">◈ threshold: <span class="pb-only">PacBio ≥ <b>0.99</b></span><span class="ont-only">ONT ≥ <b>0.95</b></span></span></p>
+        <div class="tools"><span class="tool">pysam</span><span class="tool">identity_check.py</span></div>
+        <div class="io">
+          <div class="col"><h4><span class="glyph">↓</span> inputs</h4><div class="files"><div class="file"><span class="ft bam">bam</span><span class="fp">{sample}.sorted.bam</span></div></div></div>
+          <div class="col"><h4><span class="glyph">↑</span> outputs</h4><div class="files"><div class="file"><span class="ft">txt</span><span class="fp">qc/identity/{sample}.identity.txt <span class="note">(mean, pass/fail)</span></span></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section class="stage" id="s5">
+      <div class="card">
+        <div class="head">
+          <span class="stagenum">05</span>
+          <div>
+            <h3>IsoQuant — discovery &amp; quantification</h3>
+            <div class="rulefile">workflow/rules/isoquant.smk · isoquant_discovery</div>
+          </div>
+          <span class="scope">per platform</span>
+        </div>
+        <p class="desc">All BAMs of one platform go into a single IsoQuant run — it takes one
+        <code>--data_type</code>, so PacBio and ONT are separate invocations. Reads are grouped back to
+        samples with <code>--read_group file_name</code>, giving a novel-and-known transcript catalog plus counts.</p>
+        <div class="tools"><span class="tool">isoquant.py</span></div>
+        <div class="io">
+          <div class="col"><h4><span class="glyph">↓</span> inputs</h4><div class="files">
+            <div class="file"><span class="ft bam">bam</span><span class="fp">all {platform} sorted BAMs</span></div>
+            <div class="file"><span class="ft gtf">gtf</span><span class="fp">gencode.v41 (guide)</span></div>
+          </div></div>
+          <div class="col"><h4><span class="glyph">↑</span> outputs</h4><div class="files">
+            <div class="file"><span class="ft gtf">gtf</span><span class="fp">isoquant/{platform}/models.gtf</span></div>
+            <div class="file"><span class="ft">tsv</span><span class="fp">discovery_grouped_counts.tsv</span></div>
+          </div></div>
+        </div>
+        <pre class="cmd"><span class="k">isoquant.py</span> --data_type <span class="pb-only fl-pb">pacbio_ccs</span><span class="ont-only fl-ont">nanopore</span> --reference genome.fa --genedb gencode.v41.gtf \
+  --bam {platform}/*.sorted.bam --read_group file_name --output isoquant/{platform}</pre>
+      </div>
+    </section>
+
+    <!-- 06 -->
+    <section class="stage" id="s6">
+      <div class="card">
+        <div class="head">
+          <span class="stagenum">06</span>
+          <div>
+            <h3>SQANTI3 — QC &amp; classification</h3>
+            <div class="rulefile">workflow/rules/sqanti.smk · sqanti3_qc <span style="color:var(--ont)">[env: sqanti3]</span></div>
+          </div>
+          <span class="scope">per platform</span>
+        </div>
+        <p class="desc">Classify every discovered model against GENCODE v41 (FSM / ISM / NIC / NNC / …) and
+        compute the artifact descriptors — CAGE support, polyA motifs, RT-switching, intra-priming — that
+        the next stage filters on. Runs in SQANTI3's own conda env.</p>
+        <div class="tools"><span class="tool">sqanti3_qc.py</span><span class="tool">CAGE&nbsp;peak</span><span class="tool">polyA&nbsp;motifs</span></div>
+        <div class="io">
+          <div class="col"><h4><span class="glyph">↓</span> inputs</h4><div class="files">
+            <div class="file"><span class="ft gtf">gtf</span><span class="fp">isoquant/{platform}/models.gtf</span></div>
+            <div class="file"><span class="ft gtf">gtf</span><span class="fp">gencode.v41 + CAGE + polyA</span></div>
+          </div></div>
+          <div class="col"><h4><span class="glyph">↑</span> outputs</h4><div class="files">
+            <div class="file"><span class="ft">txt</span><span class="fp">{platform}_classification.txt</span></div>
+            <div class="file"><span class="ft gtf">gtf</span><span class="fp">{platform}_corrected.gtf</span></div>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 -->
+    <section class="stage" id="s7">
+      <div class="card">
+        <div class="head">
+          <span class="stagenum">07</span>
+          <div>
+            <h3>SQANTI3 — rules filter</h3>
+            <div class="rulefile">workflow/rules/filter.smk · sqanti3_filter <span style="color:var(--ont)">[env: sqanti3]</span></div>
+          </div>
+          <span class="scope">per platform</span>
+        </div>
+        <p class="desc">Apply the paper's category-specific rules (<code>filtering.json</code>, vendored from the
+        Brain_Iso-Seq repo) to drop likely artifacts and produce the cleaned annotation the final
+        quantification runs against.</p>
+        <div class="tools"><span class="tool">sqanti3_filter.py&nbsp;rules</span><span class="tool">filtering.json</span></div>
+        <div class="io">
+          <div class="col"><h4><span class="glyph">↓</span> inputs</h4><div class="files">
+            <div class="file"><span class="ft">txt</span><span class="fp">classification.txt</span></div>
+            <div class="file"><span class="ft gtf">gtf</span><span class="fp">corrected.gtf</span></div>
+            <div class="file"><span class="ft">json</span><span class="fp">filtering.json</span></div>
+          </div></div>
+          <div class="col"><h4><span class="glyph">↑</span> outputs</h4><div class="files">
+            <div class="file"><span class="ft gtf">gtf</span><span class="fp">sqanti/{platform}/filtered.gtf <span class="note">artifact-cleaned</span></span></div>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 08 -->
+    <section class="stage" id="s8">
+      <div class="card">
+        <div class="head">
+          <span class="stagenum">08</span>
+          <div>
+            <h3>IsoQuant — re-quantify (final)</h3>
+            <div class="rulefile">workflow/rules/isoquant.smk · isoquant_requant</div>
+          </div>
+          <span class="scope">per platform</span>
+        </div>
+        <p class="desc">Quantify the same reads against the <b>filtered</b> catalog with
+        <code>--no_model_construction</code> — no new models, just counts and TPM over the clean set.
+        This is the pipeline's headline output.</p>
+        <div class="tools"><span class="tool">isoquant.py&nbsp;--no_model_construction</span></div>
+        <div class="io">
+          <div class="col"><h4><span class="glyph">↓</span> inputs</h4><div class="files">
+            <div class="file"><span class="ft bam">bam</span><span class="fp">{platform} sorted BAMs</span></div>
+            <div class="file"><span class="ft gtf">gtf</span><span class="fp">filtered.gtf</span></div>
+          </div></div>
+          <div class="col"><h4><span class="glyph">↑</span> outputs</h4><div class="files">
+            <div class="file"><span class="ft">tsv</span><span class="fp">quant/{platform}/transcript_grouped_counts.tsv</span></div>
+            <div class="file"><span class="ft">tsv</span><span class="fp">quant/{platform}/transcript_grouped_tpm.tsv</span></div>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 09 -->
+    <section class="stage" id="s9">
+      <div class="card">
+        <div class="head">
+          <span class="stagenum">09</span>
+          <div>
+            <h3>Downstream — gene-of-interest table</h3>
+            <div class="rulefile">workflow/rules/downstream.smk · app_isoform_table</div>
+          </div>
+          <span class="scope">optional</span>
+        </div>
+        <p class="desc">Join final counts with SQANTI3 categories and slice to a gene of interest
+        (default <code>APP</code>). Config-gated, alongside stubs for SUPPA2 (AS events / PSI) and DESeq2
+        (differential isoform expression).</p>
+        <div class="tools"><span class="tool">app_isoform_table.py</span><span class="tool">SUPPA2&nbsp;(opt)</span><span class="tool">DESeq2&nbsp;(opt)</span></div>
+        <div class="io">
+          <div class="col"><h4><span class="glyph">↓</span> inputs</h4><div class="files">
+            <div class="file"><span class="ft">tsv</span><span class="fp">final counts + classification</span></div>
+          </div></div>
+          <div class="col"><h4><span class="glyph">↑</span> outputs</h4><div class="files">
+            <div class="file"><span class="ft">tsv</span><span class="fp">downstream/app_isoform_table.tsv</span></div>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- INPUTS -->
+    <section class="panel" id="inputs" style="scroll-margin-top:80px">
+      <h2>Inputs <span class="lbl">what you provide</span></h2>
+      <p class="sub">Two files. The pipeline is generic — point the samplesheet at any FASTQs and set
+      the config once.</p>
+      <div class="twocol">
+        <div class="subcard">
+          <div class="sc-h">samplesheet <span class="path">config/samples.tsv</span></div>
+          <div class="sc-b">
+            <table class="ss">
+              <tr><th>column</th><th>meaning</th></tr>
+              <tr><td>sample</td><td>unique id</td></tr>
+              <tr><td>group</td><td>region / condition</td></tr>
+              <tr><td>platform</td><td>pacbio | ont</td></tr>
+              <tr><td>oriented</td><td>yes | no <span style="color:var(--muted)">(ONT → pychopper)</span></td></tr>
+              <tr><td>fastq</td><td>absolute path to reads</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="subcard">
+          <div class="sc-h">config <span class="path">config/config.yaml</span></div>
+          <div class="sc-b">
+            <ul class="k-list">
+              <li><span class="key">reference</span><span class="val">genome + GTF URLs (GRCh38, GENCODE v41)</span></li>
+              <li><span class="key">conda_env</span><span class="val">main env name — <code>lr_pipeline</code></span></li>
+              <li><span class="key">conda_env_sqanti</span><span class="val">SQANTI3 env name — <code>sqanti3</code></span></li>
+              <li><span class="key">length_filter</span><span class="val">min 100 · max 15000</span></li>
+              <li><span class="key">qc</span><span class="val">identity thresholds + gate mode</span></li>
+              <li><span class="key">platforms</span><span class="val">minimap2 preset + IsoQuant data_type</span></li>
+              <li><span class="key">downstream</span><span class="val">app table / SUPPA2 / DESeq2 toggles</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="ic">◆</span>
+        <div>Input is <b>full-length reads FASTQ</b> — HiFi for PacBio, basecalled cDNA for ONT.
+        Raw PacBio subreads need <code>ccs</code> first (out of scope). A ready SG-NEx A549 test pair
+        ships in <code>config/samples_sgnex.tsv</code>.</div>
+      </div>
+    </section>
+
+    <!-- OUTPUTS -->
+    <section class="panel" id="outputs" style="scroll-margin-top:80px">
+      <h2>Outputs <span class="lbl">results/</span></h2>
+      <p class="sub">Everything lands under <code>results/</code>, with IsoQuant/SQANTI3 products split by
+      platform. The highlighted lines are the headline deliverables.</p>
+      <div class="subcard">
+        <div class="sc-h">results/ <span class="path">per run</span></div>
+        <div class="sc-b">
+<pre class="tree"><span class="d">results/</span>
+├─ <span class="d">qc/</span>          <span class="cm"># seqkit stats, NanoPlot, identity gate</span>
+├─ <span class="d">reads/</span>       <span class="cm"># length-filtered (+ pychopper) FASTQ</span>
+├─ <span class="d">align/</span>       {sample}.sorted.bam (+ .bai)   <span class="cm"># kept</span>
+├─ <span class="d">isoquant/</span>{platform}/models.gtf
+├─ <span class="d">sqanti/</span>{platform}/  qc/…_classification.txt
+│                    <span class="fin">filtered.gtf</span>
+├─ <span class="d">quant/</span>{platform}/   <span class="fin">transcript_grouped_counts.tsv</span>
+│                    <span class="fin">transcript_grouped_tpm.tsv</span>
+└─ <span class="d">downstream/</span>  app_isoform_table.tsv</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- RUN -->
+    <section class="panel" id="run" style="scroll-margin-top:80px">
+      <h2>Running it <span class="lbl">two envs · pick a profile</span></h2>
+      <p class="sub">Build the two conda environments once, then launch with the <code>local</code> or
+      <code>slurm</code> profile. Rules reference their env by name, so nothing is rebuilt per run.</p>
+
+      <div class="runcard">
+        <div class="rc-h"><span class="step">1</span> Build environments (once)</div>
+<pre><span class="c"># main env (name: lr_pipeline)</span>
+conda env create -f workflow/envs/lr_pipeline.yaml
+<span class="c"># clone SQANTI3, then create its own env (name: sqanti3)</span>
+snakemake --profile profiles/local clone_sqanti3
+conda env create -f resources/SQANTI3/SQANTI3.conda_env.yml</pre>
+      </div>
+
+      <div class="runcard">
+        <div class="rc-h"><span class="step">2</span> Dry-run &amp; launch</div>
+<pre><span class="k">snakemake</span> --profile profiles/local --config samplesheet=config/samples_sgnex.tsv -n   <span class="c"># dry run</span>
+<span class="k">snakemake</span> --profile profiles/local --config samplesheet=config/samples_sgnex.tsv      <span class="c"># local</span>
+<span class="k">snakemake</span> --profile profiles/slurm --config samplesheet=config/samples_sgnex.tsv      <span class="c"># cluster</span></pre>
+      </div>
+
+      <div class="callout">
+        <span class="ic">◆</span>
+        <div><b>Two platforms, two IsoQuant runs.</b> Because IsoQuant takes a single
+        <code>--data_type</code>, a mixed PacBio + ONT cohort is quantified as separate invocations —
+        you get comparable catalogs side by side under <code>results/</code>.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <h5>Method</h5>
+        <ul>
+          <li><a href="https://www.science.org/doi/10.1126/sciadv.adj5279">Shimada et al. 2024 · Sci Adv</a></li>
+          <li><a href="https://github.com/mihshimada/Brain_Iso-Seq">Brain_Iso-Seq (filtering.json)</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Core tools</h5>
+        <ul>
+          <li><a href="https://github.com/lh3/minimap2">minimap2</a> · <a href="https://github.com/ablab/IsoQuant">IsoQuant</a></li>
+          <li><a href="https://github.com/ConesaLab/SQANTI3">SQANTI3</a> · <a href="https://github.com/nanoporetech/pychopper">pychopper</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Test data</h5>
+        <ul>
+          <li><a href="https://github.com/GoekeLab/sg-nex-data">SG-NEx</a> — A549 PacBio + ONT</li>
+          <li>GRCh38 · GENCODE v41</li>
+        </ul>
+      </div>
+    </div>
+    <div class="divider" style="margin-top:24px"></div>
+    <p style="margin-top:16px">lr_pipeline · Snakemake workflow documentation · toggle PacBio / ONT above to see how flags change.</p>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    // platform toggle
+    var body=document.body; body.dataset.platform="pacbio";
+    var btns=document.querySelectorAll('.toggle button');
+    btns.forEach(function(b){
+      b.addEventListener('click',function(){
+        body.dataset.platform=b.dataset.p;
+        btns.forEach(function(x){x.setAttribute('aria-pressed', x===b ? 'true':'false');});
+      });
+    });
+    // scrollspy
+    var links={}, obsTargets=[];
+    document.querySelectorAll('nav.rail a').forEach(function(a){
+      var id=a.getAttribute('href').slice(1); links[id]=a;
+      var t=document.getElementById(id); if(t) obsTargets.push(t);
+    });
+    if('IntersectionObserver' in window){
+      var io=new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if(e.isIntersecting){
+            Object.values(links).forEach(function(l){l.classList.remove('active');});
+            var l=links[e.target.id]; if(l) l.classList.add('active');
+          }
+        });
+      },{rootMargin:'-45% 0px -50% 0px',threshold:0});
+      obsTargets.forEach(function(t){io.observe(t);});
+    }
+  })();
+</script>

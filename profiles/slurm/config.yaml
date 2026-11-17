@@ -1,0 +1,32 @@
+# SLURM execution profile:  snakemake --profile profiles/slurm
+# Requires: snakemake-executor-plugin-slurm (in the shared env).
+# FILL IN slurm_account and slurm_partition for your cluster.
+executor: slurm
+use-conda: true
+conda-frontend: mamba
+jobs: 20
+rerun-incomplete: true
+printshellcmds: true
+default-resources:
+  slurm_account: "CHANGE_ME"
+  slurm_partition: "CHANGE_ME"
+  mem_mb: 8000
+  cpus_per_task: 2
+  runtime: 240        # minutes
+set-resources:
+  minimap2_align:
+    cpus_per_task: 16
+    mem_mb: 32000
+    runtime: 480
+  isoquant_discovery:
+    cpus_per_task: 16
+    mem_mb: 64000
+    runtime: 1440
+  isoquant_requant:
+    cpus_per_task: 16
+    mem_mb: 64000
+    runtime: 1440
+  sqanti3_qc:
+    cpus_per_task: 8
+    mem_mb: 32000
+    runtime: 480

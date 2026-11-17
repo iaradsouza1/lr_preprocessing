@@ -1,0 +1,6 @@
+sample	group	platform	oriented	fastq
+# SG-NEx A549 matched PacBio + ONT test pair (full files).
+# Download first:  bash workflow/scripts/download_sgnex_test.sh
+# Then run:        snakemake --profile profiles/local --config samplesheet=config/samples_sgnex.tsv
+A549_PacBio	A549	pacbio	yes	/dora_zfs/home/deso14_OSUMC/brain_long_read/pipeline/lr_pipeline/resources/sgnex_test/SGNex_A549_PacBio_rep7.fastq.gz
+A549_ONTcDNA	A549	ont	no	/dora_zfs/home/deso14_OSUMC/brain_long_read/pipeline/lr_pipeline/resources/sgnex_test/SGNex_A549_ONTcDNA_rep1.fastq.gz

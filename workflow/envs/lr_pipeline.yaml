@@ -1,0 +1,32 @@
+# Main environment, used by every rule EXCEPT the two SQANTI3 rules.
+# (--use-conda references it by name via config["conda_env"] = "lr_pipeline".)
+#
+# BUILD (once):
+#   conda env create -f workflow/envs/lr_pipeline.yaml
+#
+# SQANTI3 has its OWN env (name: sqanti3) built from its cloned repo:
+#   conda env create -f resources/SQANTI3/SQANTI3.conda_env.yml
+# The SQANTI3 rules reference that env via config["conda_env_sqanti"].
+name: lr_pipeline
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python >=3.10
+  # alignment / read handling
+  - minimap2 >=2.26
+  - samtools >=1.19
+  - seqkit >=2.6
+  - pychopper >=2.7          # ONT cDNA orientation
+  - nanoplot >=1.42          # read QC
+  # isoform discovery + quantification
+  - isoquant >=3.3
+  # annotation / gtf utilities (shared with SQANTI3)
+  - gffread
+  - gffutils
+  - bedtools
+  - pysam
+  - pandas
+  - numpy
+  # optional downstream
+  - suppa >=2.3              # AS events / PSI (config-gated)

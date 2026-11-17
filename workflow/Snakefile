@@ -1,0 +1,22 @@
+from snakemake.utils import min_version
+
+min_version("8.0")
+
+
+configfile: "config/config.yaml"
+
+
+include: "rules/common.smk"
+include: "rules/refs.smk"
+include: "rules/qc.smk"
+include: "rules/preprocess.smk"
+include: "rules/align.smk"
+include: "rules/isoquant.smk"
+include: "rules/sqanti.smk"
+include: "rules/filter.smk"
+include: "rules/downstream.smk"
+
+
+rule all:
+    input:
+        all_targets(),

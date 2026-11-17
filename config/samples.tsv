@@ -1,0 +1,10 @@
+sample	group	platform	oriented	fastq
+# One row per sample. Columns:
+#   sample   : unique id (no spaces)
+#   group    : biological grouping (e.g. brain region / condition)
+#   platform : pacbio | ont   -> drives minimap2 preset + IsoQuant --data_type + identity gate
+#   oriented : yes | no       -> ONT only; "no" runs pychopper first. PacBio HiFi: yes
+#   fastq    : absolute path to full-length reads FASTQ(.gz)
+# Example rows (delete the comment lines and these examples before a real run):
+DRR481115	Cerebellum	pacbio	yes	/dora_zfs/home/deso14_OSUMC/brain_long_read/3_brain_regions_controls/reads/DRR481115.hifi.fastq.gz
+DRR481120	Temporal_cortex	pacbio	yes	/dora_zfs/home/deso14_OSUMC/brain_long_read/3_brain_regions_controls/reads/DRR481120.hifi.fastq.gz

@@ -1,0 +1,72 @@
+# ===========================================================================
+# lr_pipeline — generic long-read isoform discovery / QC / quantification
+# Reproduces Shimada et al. 2024 (sciadv.adj5279) methodology, generically.
+# Edit paths + samplesheet, then run with a profile (profiles/local | profiles/slurm).
+# ===========================================================================
+
+samplesheet: "config/samples.tsv"
+outdir: "results"
+
+# Name of the pre-built conda env used by MOST rules (create it once with
+#   conda env create -f workflow/envs/lr_pipeline.yaml
+# then run snakemake with --use-conda; rules reference it by name, so the env
+# is never re-created per run).
+conda_env: "lr_pipeline"
+
+# SQANTI3 ships (and requires) its own conda env. The two SQANTI3 rules use this
+# env instead of the main one. Create it from the cloned repo:
+#   conda env create -f resources/SQANTI3/SQANTI3.conda_env.yml   # name: sqanti3
+conda_env_sqanti: "sqanti3"
+
+# --- Reference (GRCh38 primary assembly + GENCODE v41, matching Shimada) ----
+reference:
+  genome_fasta: "resources/GRCh38.primary_assembly.genome.fa"
+  genome_url:   "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/GRCh38.primary_assembly.genome.fa.gz"
+  gtf:          "resources/gencode.v41.annotation.gtf"
+  gtf_url:      "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/gencode.v41.annotation.gtf.gz"
+
+# --- SQANTI3 (cloned, not a conda package) ---------------------------------
+sqanti3:
+  repo_dir:     "resources/SQANTI3"
+  repo_url:     "https://github.com/ConesaLab/SQANTI3.git"
+  # These ship inside the SQANTI3 repo `data/` dir (paths below are relative to repo_dir):
+  cage_peak:    "data/ref_TSS_annotation/human.refTSS_v3.1.hg38.bed"
+  polya_motifs: "data/polyA_motifs/mouse_and_human.polyA_motif.txt"
+  filter_json:  "workflow/scripts/filtering.json"   # vendored from Brain_Iso-Seq (MIT)
+
+# --- Read length gate (agreed: 100–15000 bp) -------------------------------
+length_filter:
+  min: 100
+  max: 15000
+
+# --- QC gates --------------------------------------------------------------
+qc:
+  # gate 2: mean minimap2 de:f identity must be >= threshold for the platform
+  identity_thresholds:
+    pacbio: 0.99
+    ont:    0.95
+  identity_gate: "warn"   # "warn" (log only) | "fail" (error out)
+  quality_gate:  "warn"   # gate 1 on seqkit mean quality
+
+# --- Per-platform parameter maps -------------------------------------------
+platforms:
+  pacbio:
+    minimap2_preset:    "splice:hq"
+    minimap2_extra:     "-uf -C5"
+    isoquant_data_type: "pacbio_ccs"
+  ont:
+    minimap2_preset:    "splice"
+    minimap2_extra:     "-uf"
+    isoquant_data_type: "nanopore"
+
+# --- Optional downstream (config-gated) ------------------------------------
+downstream:
+  app_isoform_table: true
+  suppa2: false
+  deseq2: false
+
+# --- Thread hints (overridden per-rule by profile set-resources) -----------
+threads:
+  align:    16
+  isoquant: 16
+  sqanti:   8
