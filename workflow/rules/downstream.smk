@@ -11,6 +11,7 @@ rule app_isoform_table:
             f"{OUT}/sqanti/{{platform}}/qc/{{platform}}_classification.txt",
             platform=PLATFORMS,
         ),
+        gtf=REF["gtf"],
     output:
         tsv=f"{OUT}/downstream/app_isoform_table.tsv",
     params:
@@ -24,6 +25,7 @@ rule app_isoform_table:
         "--gene {params.gene} "
         "--counts {input.counts} "
         "--classification {input.classification} "
+        "--gtf {input.gtf} "
         "--out {output.tsv} 2> {log}"
 
 
