@@ -1,63 +1,50 @@
 {
     "full-splice_match": [
         {
-            "perc_A_downstream_TTS":[0,59]
+            "perc_A_downstream_TTS": [
+                0,
+                59
+            ]
         }
     ],
-    "incomplete-splice_match":[
+    "incomplete-splice_match": [
         {
-            "perc_A_downstream_TTS":[0,59],
-            "RTS_stage":"FALSE",
-            "predicted_NMD":"FALSE"
-        },
-        {
-            "perc_A_downstream_TTS":[0,59],
-            "RTS_stage":"FALSE",
-            "predicted_NMD":"NA"
+            "perc_A_downstream_TTS": [
+                0,
+                59
+            ],
+            "RTS_stage": "FALSE"
         }
     ],
-    "novel_in_catalog":[
+    "novel_in_catalog": [
         {
-            "perc_A_downstream_TTS":[0,59],
-            "RTS_stage":"FALSE",
-            "all_canonical":"canonical",
-            "predicted_NMD":"FALSE"
-        },
-        {
-            "perc_A_downstream_TTS":[0,59],
-            "RTS_stage":"FALSE",
-            "all_canonical":"canonical",
-            "predicted_NMD":"NA"
+            "perc_A_downstream_TTS": [
+                0,
+                59
+            ],
+            "RTS_stage": "FALSE",
+            "all_canonical": "canonical"
         }
     ],
-    "novel_not_in_catalog":[
+    "novel_not_in_catalog": [
         {
-            "perc_A_downstream_TTS":[0,59],
-            "RTS_stage":"FALSE",
-            "all_canonical":"canonical",
-            "predicted_NMD":"FALSE"
-        },
-        {
-            "perc_A_downstream_TTS":[0,59],
-            "RTS_stage":"FALSE",
-            "all_canonical":"canonical",
-            "predicted_NMD":"NA"
+            "perc_A_downstream_TTS": [
+                0,
+                59
+            ],
+            "RTS_stage": "FALSE",
+            "all_canonical": "canonical"
         }
     ],
     "rest": [
         {
-            "perc_A_downstream_TTS":[0,59],
-            "RTS_stage":"FALSE",
-            "all_canonical":"canonical",
-            "predicted_NMD":"FALSE",
-            "coding":"coding"
-        },
-        {
-            "perc_A_downstream_TTS":[0,59],
-            "RTS_stage":"FALSE",
-            "all_canonical":"canonical",
-            "predicted_NMD":"NA",
-            "coding":"coding"
+            "perc_A_downstream_TTS": [
+                0,
+                59
+            ],
+            "RTS_stage": "FALSE",
+            "all_canonical": "canonical",
+            "coding": "coding"
         }
-     ]
+    ]
 }
