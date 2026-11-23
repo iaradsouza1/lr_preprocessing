@@ -18,6 +18,17 @@ conda_env: "lr_pipeline"
 #   conda env create -f resources/SQANTI3/SQANTI3.conda_env.yml   # name: sqanti3
 conda_env_sqanti: "sqanti3"
 
+# --- Optional read download (rules/download.smk) ---------------------------
+# Used for samples whose samplesheet `fastq` is "<outdir>/raw/<sample>.fastq.gz".
+# "url": samplesheet column `url` (e.g. ENA fastq over https), checked against column `md5` if present.
+# "sra_aws": column `run_accession`, fetched from NCBI's SRA bucket on AWS and converted with
+#   fasterq-dump; needs sra-tools, pigz and aria2 in conda_env_download.
+download_source: "url"
+download_connections: 8    # parallel connections per file (sra_aws)
+# conda_env_download: "sratools"
+subsample_reads: 0         # > 0: keep only the first N reads (quick tests; with "url")
+temp_raw_reads: false      # delete each raw file once QC and preprocessing have read it
+
 # --- Reference (GRCh38 primary assembly + GENCODE v41, matching Shimada) ----
 reference:
   genome_fasta: "resources/GRCh38.primary_assembly.genome.fa"
@@ -29,10 +40,19 @@ reference:
 sqanti3:
   repo_dir:     "resources/SQANTI3"
   repo_url:     "https://github.com/ConesaLab/SQANTI3.git"
+  repo_ref:     "v5.5.4"   # release to clone; the rules use the 5.3-5.5 command line (v6 drops --skipORF and data/)
   # These ship inside the SQANTI3 repo `data/` dir (paths below are relative to repo_dir):
   cage_peak:    "data/ref_TSS_annotation/human.refTSS_v3.1.hg38.bed"
   polya_motifs: "data/polyA_motifs/mouse_and_human.polyA_motif.txt"
   filter_json:  "workflow/scripts/filtering.json"   # vendored from Brain_Iso-Seq (MIT)
+
+# --- ONT cDNA orientation (pychopper, samples with oriented: "no") ---------
+pychopper_kit: ""      # cDNA kit, e.g. "PCS111" (SQK-PCS111); "" = pychopper's default (PCS109)
+pychopper_extra: ""    # e.g. "-m edlib": the default phmm ran ~650 reads/s on 8 threads
+pychopper_chunks: 1    # >1 splits each sample and runs that many pychopper processes side by side
+
+# delete filtered reads once aligned (they are large and only minimap2 reads them)
+temp_filtered_reads: false
 
 # --- Read length gate (agreed: 100–15000 bp) -------------------------------
 length_filter:
@@ -47,6 +67,7 @@ qc:
     ont:    0.95
   identity_gate: "warn"   # "warn" (log only) | "fail" (error out)
   quality_gate:  "warn"   # gate 1 on seqkit mean quality
+  nanoplot_extra: ""      # e.g. "--downsample 2000000" for samples of 100M+ reads
 
 # --- Per-platform parameter maps -------------------------------------------
 platforms:
@@ -58,6 +79,15 @@ platforms:
     minimap2_preset:    "splice"
     minimap2_extra:     "-uf"
     isoquant_data_type: "nanopore"
+    # extra IsoQuant flags for this platform, e.g. "--stranded forward" when pychopper has oriented the reads
+    isoquant_extra:     ""
+
+# --- IsoQuant --------------------------------------------------------------
+# extra flags for discovery only, e.g. "--complete_genedb" for GENCODE (gene and transcript records present)
+isoquant_reference_flags: ""
+# node-local scratch for IsoQuant's gene database and the requant output (SQLite and IsoQuant's
+# per-read temp files are very slow on shared/parallel filesystems)
+isoquant_local_dir: "/tmp"
 
 # --- Optional downstream (config-gated) ------------------------------------
 downstream:
@@ -69,4 +99,5 @@ downstream:
 threads:
   align:    16
   isoquant: 16
+  isoquant_requant: 16   # per-sample requant jobs
   sqanti:   8

@@ -20,13 +20,13 @@ dependencies:
   - pychopper >=2.7          # ONT cDNA orientation
   - nanoplot >=1.42          # read QC
   # isoform discovery + quantification
-  - isoquant >=3.3
+  - isoquant >=3.13,<4       # --yaml input (>=3.7); requant wrapper patches 3.13 internals; 4.x drops --no_model_construction
   # annotation / gtf utilities (shared with SQANTI3)
   - gffread
   - gffutils
   - bedtools
   - pysam
-  - pandas
+  - pandas <3               # pychopper 2.7.10 report code fails with pandas 3 (float(Series))
   - numpy
   # optional downstream
   - suppa >=2.3              # AS events / PSI (config-gated)
