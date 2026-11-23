@@ -21,13 +21,14 @@ rule nanoplot:
         html=f"{OUT}/qc/nanoplot/{{sample}}/NanoPlot-report.html",
     params:
         outdir=lambda w: f"{OUT}/qc/nanoplot/{w.sample}",
+        extra=config["qc"].get("nanoplot_extra", ""),
     threads: 4
     log:
         f"{OUT}/logs/qc/nanoplot_{{sample}}.log",
     conda:
         config["conda_env"]
     shell:
-        "NanoPlot -t {threads} --fastq {input.fq} -o {params.outdir} 2> {log}"
+        "NanoPlot -t {threads} {params.extra} --fastq {input.fq} -o {params.outdir} 2> {log}"
 
 
 rule identity_check:

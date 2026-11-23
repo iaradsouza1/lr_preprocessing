@@ -67,6 +67,7 @@ qc:
     ont:    0.95
   identity_gate: "warn"   # "warn" (log only) | "fail" (error out)
   quality_gate:  "warn"   # gate 1 on seqkit mean quality
+  nanoplot_extra: ""      # e.g. "--downsample 2000000" for samples of 100M+ reads
 
 # --- Per-platform parameter maps -------------------------------------------
 platforms:
