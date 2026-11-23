@@ -22,9 +22,9 @@ set-resources:
     cpus_per_task: 16
     mem_mb: 64000
     runtime: 1440
-  isoquant_requant:
+  isoquant_requant_sample:
+    # one job per sample; mem_mb comes from the rule (64 GB, doubled on retry)
     cpus_per_task: 16
-    mem_mb: 64000
     runtime: 1440
   sqanti3_qc:
     cpus_per_task: 8

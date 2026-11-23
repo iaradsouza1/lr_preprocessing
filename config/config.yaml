@@ -67,6 +67,15 @@ platforms:
     minimap2_preset:    "splice"
     minimap2_extra:     "-uf"
     isoquant_data_type: "nanopore"
+    # extra IsoQuant flags for this platform, e.g. "--stranded forward" when pychopper has oriented the reads
+    isoquant_extra:     ""
+
+# --- IsoQuant --------------------------------------------------------------
+# extra flags for discovery only, e.g. "--complete_genedb" for GENCODE (gene and transcript records present)
+isoquant_reference_flags: ""
+# node-local scratch for IsoQuant's gene database and the requant output (SQLite and IsoQuant's
+# per-read temp files are very slow on shared/parallel filesystems)
+isoquant_local_dir: "/tmp"
 
 # --- Optional downstream (config-gated) ------------------------------------
 downstream:
@@ -78,4 +87,5 @@ downstream:
 threads:
   align:    16
   isoquant: 16
+  isoquant_requant: 16   # per-sample requant jobs
   sqanti:   8

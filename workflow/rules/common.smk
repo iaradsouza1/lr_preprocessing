@@ -28,6 +28,10 @@ def maybe_temp(path, key):
     return temp(path) if config.get(key, False) else path
 
 
+def platform_extra(p, key):
+    return config["platforms"][p].get(key, "")
+
+
 def platform_of(sample):
     return samples.loc[sample, "platform"]
 
