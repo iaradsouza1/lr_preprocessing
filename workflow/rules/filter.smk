@@ -22,10 +22,13 @@ rule sqanti3_filter:
     shell:
         r"""
         set -euo pipefail
+        # SQANTI3's env pip-installs pyarrow, which loads the first libstdc++ it finds (its own
+        # folder, then the system's); the system one is too old for pandas, so put the env first
+        export LD_LIBRARY_PATH="$CONDA_PREFIX/lib${{LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}}"
         python {params.script} rules \
             --sqanti_class {input.classification} \
-            --gtf {input.corrected_gtf} \
-            --json_filter {input.json} \
+            --filter_gtf {input.corrected_gtf} \
+            --json_filter {input.json} --skip_report \
             -d {params.outdir} -o {params.prefix} > {log} 2>&1
         # normalize SQANTI3's filtered-GTF output name to a canonical path
         cp {params.outdir}/{params.prefix}.filtered.gtf {output.gtf}

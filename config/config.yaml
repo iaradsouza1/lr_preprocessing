@@ -29,6 +29,7 @@ reference:
 sqanti3:
   repo_dir:     "resources/SQANTI3"
   repo_url:     "https://github.com/ConesaLab/SQANTI3.git"
+  repo_ref:     "v5.5.4"   # release to clone; the rules use the 5.3-5.5 command line (v6 drops --skipORF and data/)
   # These ship inside the SQANTI3 repo `data/` dir (paths below are relative to repo_dir):
   cage_peak:    "data/ref_TSS_annotation/human.refTSS_v3.1.hg38.bed"
   polya_motifs: "data/polyA_motifs/mouse_and_human.polyA_motif.txt"

@@ -1,6 +1,7 @@
 # SQANTI3 QC: classify IsoQuant transcript models vs GENCODE v41 + CAGE + polyA.
 # NOTE: SQANTI3 CLI differs slightly across versions — verify flags against the
-#       cloned resources/SQANTI3 (v6.x) and adjust the output filenames if needed.
+#       cloned resources/SQANTI3 and adjust the output filenames if needed.
+#       The command below is the SQANTI3 5.3-5.5 syntax (tested with v5.5.4, config sqanti3.repo_ref).
 
 
 rule sqanti3_qc:
@@ -27,8 +28,11 @@ rule sqanti3_qc:
     shell:
         r"""
         set -euo pipefail
-        python {params.script} {input.gtf} {input.ref_gtf} {input.fa} \
+        # SQANTI3's env pip-installs pyarrow, which loads the first libstdc++ it finds (its own
+        # folder, then the system's); the system one is too old for pandas, so put the env first
+        export LD_LIBRARY_PATH="$CONDA_PREFIX/lib${{LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}}"
+        python {params.script} --isoforms {input.gtf} --refGTF {input.ref_gtf} --refFasta {input.fa} \
             --CAGE_peak {params.cage} --polyA_motif_list {params.polya} \
-            --cpus {threads} --report skip --skipORF \
+            -t {threads} --report skip --skipORF \
             -d {params.outdir} -o {params.prefix} > {log} 2>&1
         """

@@ -58,7 +58,8 @@ rule clone_sqanti3:
     params:
         url=SQ["repo_url"],
         dest=SQ["repo_dir"],
+        ref=lambda w: f"--branch {SQ['repo_ref']}" if SQ.get("repo_ref") else "",
     log:
         f"{OUT}/logs/refs/clone_sqanti3.log",
     shell:
-        "( [ -d {params.dest}/.git ] || git clone --depth 1 {params.url} {params.dest} ) > {log} 2>&1 && touch {output.marker}"
+        "( [ -d {params.dest}/.git ] || git clone --depth 1 {params.ref} {params.url} {params.dest} ) > {log} 2>&1 && touch {output.marker}"
