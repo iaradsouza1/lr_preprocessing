@@ -18,6 +18,17 @@ conda_env: "lr_pipeline"
 #   conda env create -f resources/SQANTI3/SQANTI3.conda_env.yml   # name: sqanti3
 conda_env_sqanti: "sqanti3"
 
+# --- Optional read download (rules/download.smk) ---------------------------
+# Used for samples whose samplesheet `fastq` is "<outdir>/raw/<sample>.fastq.gz".
+# "url": samplesheet column `url` (e.g. ENA fastq over https), checked against column `md5` if present.
+# "sra_aws": column `run_accession`, fetched from NCBI's SRA bucket on AWS and converted with
+#   fasterq-dump; needs sra-tools, pigz and aria2 in conda_env_download.
+download_source: "url"
+download_connections: 8    # parallel connections per file (sra_aws)
+# conda_env_download: "sratools"
+subsample_reads: 0         # > 0: keep only the first N reads (quick tests; with "url")
+temp_raw_reads: false      # delete each raw file once QC and preprocessing have read it
+
 # --- Reference (GRCh38 primary assembly + GENCODE v41, matching Shimada) ----
 reference:
   genome_fasta: "resources/GRCh38.primary_assembly.genome.fa"
