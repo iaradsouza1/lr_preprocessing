@@ -38,6 +38,10 @@ sqanti3:
 # --- ONT cDNA orientation (pychopper, samples with oriented: "no") ---------
 pychopper_kit: ""      # cDNA kit, e.g. "PCS111" (SQK-PCS111); "" = pychopper's default (PCS109)
 pychopper_extra: ""    # e.g. "-m edlib": the default phmm ran ~650 reads/s on 8 threads
+pychopper_chunks: 1    # >1 splits each sample and runs that many pychopper processes side by side
+
+# delete filtered reads once aligned (they are large and only minimap2 reads them)
+temp_filtered_reads: false
 
 # --- Read length gate (agreed: 100–15000 bp) -------------------------------
 length_filter:

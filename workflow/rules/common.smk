@@ -23,6 +23,11 @@ wildcard_constraints:
 
 
 # --- per-sample / per-platform helpers -------------------------------------
+def maybe_temp(path, key):
+    # temp() when config[key] is true: large intermediates are deleted once consumed
+    return temp(path) if config.get(key, False) else path
+
+
 def platform_of(sample):
     return samples.loc[sample, "platform"]
 
