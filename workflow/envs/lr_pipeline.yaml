@@ -26,7 +26,7 @@ dependencies:
   - gffutils
   - bedtools
   - pysam
-  - pandas
+  - pandas <3               # pychopper 2.7.10 report code fails with pandas 3 (float(Series))
   - numpy
   # optional downstream
   - suppa >=2.3              # AS events / PSI (config-gated)

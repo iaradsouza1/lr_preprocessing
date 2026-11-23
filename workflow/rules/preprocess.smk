@@ -11,6 +11,10 @@ rule prepare_reads:
         minlen=config["length_filter"]["min"],
         maxlen=config["length_filter"]["max"],
         tmp=lambda w: f"{OUT}/reads/{w.sample}.pychopper.fastq",
+        # cDNA kit of the library (pychopper's default is PCS109); "" keeps the default
+        kit=lambda w: f"-k {config['pychopper_kit']}" if config.get("pychopper_kit") else "",
+        # e.g. "-m edlib": much faster than the default phmm on large runs
+        extra=config.get("pychopper_extra", ""),
     threads: 8
     log:
         f"{OUT}/logs/preprocess/{{sample}}.log",
@@ -20,7 +24,7 @@ rule prepare_reads:
         r"""
         set -euo pipefail
         if [ "{params.do_pychopper}" = "True" ]; then
-            pychopper -t {threads} {input.fq} {params.tmp} > {log} 2>&1
+            pychopper -t {threads} {params.kit} {params.extra} {input.fq} {params.tmp} > {log} 2>&1
             seqkit seq -j {threads} -m {params.minlen} -M {params.maxlen} {params.tmp} \
                 | gzip -c > {output.fq} 2>> {log}
             rm -f {params.tmp}

@@ -35,6 +35,10 @@ sqanti3:
   polya_motifs: "data/polyA_motifs/mouse_and_human.polyA_motif.txt"
   filter_json:  "workflow/scripts/filtering.json"   # vendored from Brain_Iso-Seq (MIT)
 
+# --- ONT cDNA orientation (pychopper, samples with oriented: "no") ---------
+pychopper_kit: ""      # cDNA kit, e.g. "PCS111" (SQK-PCS111); "" = pychopper's default (PCS109)
+pychopper_extra: ""    # e.g. "-m edlib": the default phmm ran ~650 reads/s on 8 threads
+
 # --- Read length gate (agreed: 100–15000 bp) -------------------------------
 length_filter:
   min: 100
